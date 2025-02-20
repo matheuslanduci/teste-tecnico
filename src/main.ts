@@ -26,13 +26,13 @@ app.post("/tasks", async (req, res) => {
 
 	if (!output.success) {
 		res.status(400);
-		return res.json({ error: output.error });
+		res.json({ error: output.error });
 	}
 
 	const task = await TaskModel.create(output.data);
 
 	res.status(201);
-	return res.json({
+	res.json({
 		task,
 	});
 });
@@ -48,14 +48,14 @@ app.put("/tasks/:id", async (req, res) => {
 
 	if (!output.success) {
 		res.status(400);
-		return res.json({ error: output.error });
+		res.json({ error: output.error });
 	}
 
 	const task = await TaskModel.findById(req.params.id);
 
 	if (!task) {
 		res.status(404);
-		return res.json({ error: "Task not found" });
+		res.json({ error: "Task not found" });
 	}
 
 	const updatedTask = await TaskModel.findByIdAndUpdate(
@@ -74,7 +74,7 @@ app.delete("/tasks/:id", async (req, res) => {
 
 	if (!task) {
 		res.status(404);
-		return res.json({ error: "Task not found" });
+		res.json({ error: "Task not found" });
 	}
 
 	await TaskModel.findByIdAndDelete(req.params.id);
