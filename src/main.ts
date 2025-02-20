@@ -2,6 +2,7 @@ import "dotenv/config";
 
 import express from "express";
 import { z } from "zod";
+import { connectKafka, consumer, producer } from "./config/kafka";
 import { connectMongo } from "./config/mongo";
 import { TaskModel } from "./models/task";
 
@@ -29,9 +30,21 @@ app.post("/tasks", async (req, res) => {
 		res.json({ error: output.error });
 	}
 
-	const task = await TaskModel.create(output.data);
+	const task = output.data;
 
-	res.status(201);
+	await producer.send({
+		messages: [
+			{
+				value: JSON.stringify({
+					type: "task_created",
+					task,
+				}),
+			},
+		],
+		topic: "tasks",
+	});
+
+	res.status(202);
 	res.json({
 		task,
 	});
@@ -85,9 +98,44 @@ app.delete("/tasks/:id", async (req, res) => {
 
 async function main() {
 	await connectMongo();
+	await connectKafka();
 
 	app.listen(3000, () => {
 		console.log("App running");
+	});
+
+	await consumer.subscribe({ topic: "tasks" });
+
+	await consumer.run({
+		eachMessage: async ({ topic, partition, message }) => {
+			const schema = z.object({
+				type: z.string(),
+				task: z.object({
+					title: z.string(),
+					description: z.string(),
+					completed: z.boolean(),
+				}),
+			});
+
+			const output = schema.safeParse(
+				JSON.parse(message.value?.toString() || "{}"),
+			);
+
+			if (!output.success) {
+				console.error(output.error);
+				return;
+			}
+
+			const { type, task } = output.data;
+
+			console.log(type, task);
+
+			if (type === "task_created") {
+				const result = await TaskModel.create(task);
+
+				console.log("Task created", result);
+			}
+		},
 	});
 }
 
